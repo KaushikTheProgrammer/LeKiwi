@@ -665,7 +665,7 @@
             </geometry>
         </collision>
     </link>
-    <link name="Wrist_Roll_08c-v1">
+    <link name="Fixed_Jaw">
         <inertial>
             <origin xyz="0.013763229636538839 0.011847838431604849 -0.02681060701774312" rpy="0.0 -0.0 0.0" />
             <mass value="0.44698022927880193" />
@@ -703,7 +703,7 @@
             </geometry>
         </collision>
     </link>
-    <link name="Moving_Jaw_08d-v1">
+    <link name="Moving_Jaw">
         <inertial>
             <origin xyz="0.0016198187276587506 0.031683055327891375 -0.018764632295228623" rpy="0.0 -0.0 1.0947644252537636e-47" />
             <mass value="0.1586808414280307" />
@@ -855,6 +855,51 @@
             </geometry>
         </collision>
     </link>
+
+    <link name="root">
+        <inertial>
+          <mass value="0"/>
+          <inertia ixx="0.00" ixy="0.00" ixz="0.00" iyy="0.00" iyz="0.00" izz="0.00"/>
+        </inertial>
+      </link>
+
+      <link name="root_arm_1_link_1">
+        <inertial>
+          <mass value="0"/>
+          <inertia ixx="0.00" ixy="0.00" ixz="0.00" iyy="0.00" iyz="0.00" izz="0.00"/>
+        </inertial>
+      </link>
+
+      <link name="root_arm_1_link_2">
+        <inertial>
+          <mass value="0"/>
+          <inertia ixx="0.00" ixy="0.00" ixz="0.00" iyy="0.00" iyz="0.00" izz="0.00"/>
+        </inertial>
+      </link>
+
+      <joint name="root_x_axis_joint" type="prismatic">
+        <parent link="root"/>
+        <child link="root_arm_1_link_1"/>
+        <axis xyz="1 0 0"/>
+        <limit effort="100" lower="-20" upper="20" velocity="0.50"/>
+        <dynamics damping="10.0" friction="10"/>
+      </joint>
+
+      <joint name="root_y_axis_joint" type="prismatic">
+        <parent link="root_arm_1_link_1"/>
+        <child link="root_arm_1_link_2"/>
+        <axis xyz="0 1 0"/>
+        <limit effort="100" lower="-20" upper="20" velocity="0.50"/>
+        <dynamics damping="10.0" friction="10"/>
+      </joint>
+
+      <joint name="root_z_rotation_joint" type="continuous">
+        <parent link="root_arm_1_link_2"/>
+        <child link="base_link"/>
+        <axis xyz="0 0 1"/>
+        <dynamics damping="10.0" friction="1"/>
+      </joint>
+
     <joint name="base_plate_layer1-v5_baseplate2bottom_mount" type="fixed">
         <origin xyz="-0.02 -0.1 0.0" rpy="3.141592653589793 -0.0 0.0" />
         <parent link="base_plate_layer1-v5" />
@@ -998,6 +1043,7 @@
         <parent link="STS3215_03a-v1" />
         <child link="Rotation_Pitch_08i-v1" />
         <axis xyz="-3.944304526105059e-31 3.944304526105059e-31 1.0" />
+        <limit lower="-2.0" upper="2.0" effort="0" velocity="0" />
     </joint>
     <joint name="Rotation_Pitch_08i-v1_Rigid-46" type="fixed">
         <origin xyz="0.023000000000000066 -0.04085 -0.023200000000000002" rpy="-3.944304526105059e-31 -4.116117285135399e-31 -2.781046729970605e-32" />
@@ -1019,6 +1065,7 @@
         <parent link="STS3215_03a-v1-1" />
         <child link="SO_ARM100_08k_116_Square-v1" />
         <axis xyz="1.0 0.0 0.0" />
+        <limit lower="-1.5708" upper="1.5708" effort="0" velocity="0" />
     </joint>
     <joint name="SO_ARM100_08k_116_Square-v1_Rigid-50" type="fixed">
         <origin xyz="-0.03610000000000001 -0.10151227 -0.013699510000000003" rpy="-7.511797348558594e-34 -4.930380657631324e-32 1.3877787807814457e-17" />
@@ -1030,6 +1077,7 @@
         <parent link="STS3215_03a-v1-2" />
         <child link="SO_ARM100_08k_Mirror-v1" />
         <axis xyz="1.0 0.0 0.0" />
+        <limit lower="-1.5708" upper="1.5708" effort="0" velocity="0" />
     </joint>
     <joint name="SO_ARM100_08k_Mirror-v1_Rigid-52" type="fixed">
         <origin xyz="-0.0361 0.09885064 0.03311837999999998" rpy="-3.1415926535897922 5.9164567891575885e-31 2.91703841149741e-62" />
@@ -1041,6 +1089,7 @@
         <parent link="STS3215_03a-v1-3" />
         <child link="Wrist_Roll_Pitch_08i-v1" />
         <axis xyz="1.0 0.0 9.860761315262648e-32" />
+        <limit lower="-1.8" upper="1.8" effort="0" velocity="0" />
     </joint>
     <joint name="Wrist_Roll_Pitch_08i-v1_Rigid-54" type="fixed">
         <origin xyz="0.0089 0.0339283 -0.04850591000000001" rpy="-3.141592653589793 -9.860761315262648e-32 0.0" />
@@ -1050,23 +1099,25 @@
     <joint name="wrist_roll" type="continuous">
         <origin xyz="-0.028999999999999998 0.00810632 0.006869499999999995" rpy="3.141592653589793 -0.0 0.0" />
         <parent link="STS3215_03a_Wrist_Roll-v1" />
-        <child link="Wrist_Roll_08c-v1" />
+        <child link="Fixed_Jaw" />
         <axis xyz="0.0 0.42261799999999994 -0.9063079999999999" />
+        <limit lower="-3.14159" upper="3.14159" effort="0" velocity="0" />
     </joint>
     <joint name="Wrist_Roll_08c-v1_Rigid-56" type="fixed">
         <origin xyz="0.012999999999999998 0.019942129999999985 -0.004906820000000014" rpy="1.5707963267948966 -0.0 0.0" />
-        <parent link="Wrist_Roll_08c-v1" />
+        <parent link="Fixed_Jaw" />
         <child link="STS3215_03a-v1-4" />
     </joint>
     <joint name="gripper" type="continuous">
         <origin xyz="-0.032799999999999996 -0.023912249999999986 0.027026410000000018" rpy="-1.5707963267948968 3.944304526105059e-31 -1.9721522630525295e-31" />
         <parent link="STS3215_03a-v1-4" />
-        <child link="Moving_Jaw_08d-v1" />
+        <child link="Moving_Jaw" />
         <axis xyz="-2.74128770133849e-31 -0.9063079999999999 -0.422618" />
+        <limit lower="-1.1" upper="1.1" effort="0" velocity="0" />
     </joint>
     <joint name="Wrist_Roll_08c-v1_Rigid-58" type="fixed">
         <origin xyz="0.012999999999999998 0.027192599999999983 -0.0015258700000000047" rpy="-1.5707963267948966 -0.0 0.0" />
-        <parent link="Wrist_Roll_08c-v1" />
+        <parent link="Fixed_Jaw" />
         <child link="Wrist-Camera-Mount-v11" />
     </joint>
     <joint name="base_plate_layer1-v5_Rigid-69" type="fixed">
@@ -1084,4 +1135,38 @@
         <parent link="Wrist-Camera-Mount-v11" />
         <child link="Camera-Model-v3-1" />
     </joint>
+
+    <!-- fake joints for useful data -->
+    <joint name="Fixed_Jaw_tip_joint" type="fixed">
+        <origin rpy="0 0 0" xyz="0.01 -0.097 0" />
+        <parent link="Fixed_Jaw" />
+        <child link="Fixed_Jaw_tip" />
+    </joint>
+    <link name="Fixed_Jaw_tip">
+        <!-- <visual>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry>
+            <sphere radius="0.01" />
+        </geometry>
+        <material name="red">
+            <color rgba="1 0 0 0.5"/>
+        </material>
+        </visual> -->
+    </link>
+    <joint name="Moving_Jaw_tip_joint" type="fixed">
+        <origin rpy="0 0 0" xyz="-0.01 -0.073 0" />
+        <parent link="Moving_Jaw" />
+        <child link="Moving_Jaw_tip" />
+    </joint>
+    <link name="Moving_Jaw_tip">
+        <!-- <visual>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry>
+            <sphere radius="0.01" />
+        </geometry>
+        <material name="red">
+            <color rgba="1 0 0 0.5"/>
+        </material>
+        </visual> -->
+    </link>
 </robot>
