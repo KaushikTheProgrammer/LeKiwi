@@ -3,51 +3,73 @@
 # import mani_skill.examples.demo_robot as demo_robot_script
 # demo_robot_script.main()
 
+from copy import deepcopy
 import sapien
+import sapien.physx as physx
 import numpy as np
 from mani_skill.agents.base_agent import BaseAgent, Keyframe
 from mani_skill.agents.controllers import *
 from mani_skill.agents.registration import register_agent
-import copy
 
+from mani_skill.utils.structs.actor import Actor
+from mani_skill.utils.structs.pose import Pose
+
+import numpy as np
+import sapien
+import sapien.render
+import torch
+from transforms3d.euler import euler2quat
+
+from mani_skill import PACKAGE_ASSET_DIR
+from mani_skill.agents.base_agent import BaseAgent, Keyframe
+from mani_skill.agents.controllers import *
+from mani_skill.agents.registration import register_agent
+from mani_skill.utils import common
+from mani_skill.utils.structs.actor import Actor
+from mani_skill.utils.structs.pose import Pose
 
 
 @register_agent()
-class LeKiwi(BaseAgent):
-    '''
-    LeKiwi robot agent file for ManiSkill environment. Inspired by the the so100 file here: https://github.com/haosulab/ManiSkill/blob/main/mani_skill/agents/robots/so100/so_100.py
-    '''
-
+class Lekiwi(BaseAgent):
     uid = "lekiwi"
-    urdf_path = "/home/ubuntu/code/LeKiwi/urdf/LeKiwi.urdf"
-    fix_root_link = False # Don't fix the root link
+    urdf_path = "/home/ubuntu/code/LeKiwi/urdf/custom_lekiwi.urdf"
 
-    # TODO: Add urdf config later for material properties
+    # urdf_config = dict(
+    #     _materials=dict(
+    #         gripper=dict(static_friction=2, dynamic_friction=2, restitution=0.0)
+    #     ),
+    #     link=dict(
+    #         Fixed_Jaw=dict(material="gripper", patch_radius=0.1, min_patch_radius=0.1),
+    #         Moving_Jaw=dict(material="gripper", patch_radius=0.1, min_patch_radius=0.1),
+    #     ),
+    # )
 
-    keyframes = dict(
-        rest=Keyframe(
-            qpos=np.array(
-                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-            ),
-            qvel=np.array(
-                [0.5, 0.5, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-            ),
-            pose=sapien.Pose(p=[0.0, 0.0, 0.05]),
-        )
-    )
+    # keyframes = dict(
+    #     rest=Keyframe(
+    #         qpos=np.array([0, -1.5708, 1.5708, 0.66, 0, -1.1]),
+    #         pose=sapien.Pose(q=euler2quat(0, 0, np.pi / 2)),
+    #     ),
+    #     zero=Keyframe(
+    #         qpos=np.array([0.0] * 6),
+    #         pose=sapien.Pose(q=euler2quat(0, 0, np.pi / 2)),
+    #     ),
+    # )
 
-    arm_joint_names = ['shoulder_pan',
-                       'shoulder_lift',
-                       'elbow_flex',
-                       'wrist_flex',
-                       'wrist_roll'
-                       ]
-    gripper_joint_names = ['gripper']
+    arm_joint_names = [
+        "shoulder_pan",
+        "shoulder_lift",
+        "elbow_flex",
+        "wrist_flex",
+        "wrist_roll",
+    ]
+    gripper_joint_names = [
+        "gripper",
+    ]
 
     @property
     def _controller_configs(self):
         pd_joint_pos = PDJointPosControllerConfig(
-            [joint for joint in self.arm_joint_names],
+            [joint.name for joint in self.robot.active_joints],
             lower=None,
             upper=None,
             stiffness=[1e3] * 6,
@@ -56,10 +78,12 @@ class LeKiwi(BaseAgent):
             normalize_action=False,
         )
 
+        # max delta permitted of 0.05 since the robot is not as accurate as more expensive arms
+        # and moving too fast can cause the robot to shake too much and damage the hardware
         pd_joint_delta_pos = PDJointPosControllerConfig(
-            [joint for joint in self.arm_joint_names],
-            lower=[-0.05, -0.05, -0.05, -0.05, -0.05, -0.2],
-            upper=[0.05, 0.05, 0.05, 0.05, 0.05, 0.2],
+            [joint.name for joint in self.robot.active_joints],
+            [-0.05, -0.05, -0.05, -0.05, -0.05, -0.2],
+            [0.05, 0.05, 0.05, 0.05, 0.05, 0.2],
             stiffness=[1e3] * 6,
             damping=[1e2] * 6,
             force_limit=100,
@@ -92,6 +116,13 @@ class LeKiwi(BaseAgent):
     @property
     def tcp_pose(self):
         return Pose.create_from_pq(self.tcp_pos, self.finger1_link.pose.q)
+
+    def _after_loading_articulation(self):
+        super()._after_loading_articulation()
+        self.finger1_link = self.robot.links_map["Fixed_Jaw"]
+        self.finger2_link = self.robot.links_map["Moving_Jaw"]
+        self.finger1_tip = self.robot.links_map["Fixed_Jaw_tip"]
+        self.finger2_tip = self.robot.links_map["Moving_Jaw_tip"]
 
     def is_grasping(self, object: Actor, min_force=0.5, max_angle=110):
         """Check if the robot is grasping an object
@@ -138,4 +169,3 @@ class LeKiwi(BaseAgent):
         T[:3, :3] = np.stack([ortho, closing, approaching], axis=1)
         T[:3, 3] = center
         return sapien.Pose(T)
-
