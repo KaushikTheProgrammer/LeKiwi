@@ -10,9 +10,12 @@ import numpy as np
 from mani_skill.agents.base_agent import BaseAgent, Keyframe
 from mani_skill.agents.controllers import *
 from mani_skill.agents.registration import register_agent
-
+from mani_skill.sensors.camera import CameraConfig
 from mani_skill.utils.structs.actor import Actor
 from mani_skill.utils.structs.pose import Pose
+from mani_skill.utils.structs.link import Link
+from mani_skill.utils.structs.types import Array
+from mani_skill.utils import common, sapien_utils
 
 import numpy as np
 import sapien
@@ -29,31 +32,72 @@ from mani_skill.utils.structs.actor import Actor
 from mani_skill.utils.structs.pose import Pose
 
 
+
+FETCH_BASE_COLLISION_BIT = 31
+"""Collision bit of the fetch base"""
+
+
 @register_agent()
 class Lekiwi(BaseAgent):
     uid = "lekiwi"
     urdf_path = "/home/ubuntu/code/LeKiwi/urdf/LeKiwi.urdf"
 
-    # urdf_config = dict(
-    #     _materials=dict(
-    #         gripper=dict(static_friction=2, dynamic_friction=2, restitution=0.0)
-    #     ),
-    #     link=dict(
-    #         Fixed_Jaw=dict(material="gripper", patch_radius=0.1, min_patch_radius=0.1),
-    #         Moving_Jaw=dict(material="gripper", patch_radius=0.1, min_patch_radius=0.1),
-    #     ),
-    # )
+    urdf_config = dict(
+        _materials=dict(
+            gripper=dict(static_friction=2.0, dynamic_friction=2.0, restitution=0.0)
+        ),
+        link=dict(
+            Fixed_Jaw=dict(
+                material="gripper", patch_radius=0.1, min_patch_radius=0.1
+            ),
+            Moving_Jaw=dict(
+                material="gripper", patch_radius=0.1, min_patch_radius=0.1
+            ),
+        ),
+    )
 
-    # keyframes = dict(
-    #     rest=Keyframe(
-    #         qpos=np.array([0, -1.5708, 1.5708, 0.66, 0, -1.1]),
-    #         pose=sapien.Pose(q=euler2quat(0, 0, np.pi / 2)),
-    #     ),
-    #     zero=Keyframe(
-    #         qpos=np.array([0.0] * 6),
-    #         pose=sapien.Pose(q=euler2quat(0, 0, np.pi / 2)),
-    #     ),
-    # )
+    keyframes = dict(
+        rest=Keyframe(
+            pose=sapien.Pose(),
+            qpos=np.array([0, 0, 0, 0, 0.303, 0.303, 0, 0, 0]),
+        )
+    )
+
+    @property
+    def _sensor_configs(self):
+        """
+        Configure cameras for Fetch robot with single-arm setup
+
+        Camera configuration includes:
+        - mobile_base_camera: Camera mounted to mobile base
+        - arm_camera: Hand-mounted camera on the arm for precise manipulation
+        """
+        return [
+            # Base Camera - Main workspace overview camera
+            CameraConfig(
+                uid="mobile_base_camera",
+                pose=Pose.create_from_pq([0, 0, 0], [1, 0, 0, 0]),  # Identity transform
+                width=256,
+                height=256,
+                fov=1.6,  # Wide field of view for workspace monitoring
+                near=0.01,
+                far=100,
+                entity_uid="Camera-Mount-v8",  # Mount to dedicated head camera link
+            ),
+
+            # ARM CAMERA - Hand-mounted camera for precise manipulation
+            CameraConfig(
+                uid="fetch_right_arm_camera",
+                pose=Pose.create_from_pq([0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]),  # Identity transform
+                width=128,
+                height=128,
+                fov=1.3,  # Wide field of view for workspace monitoring
+                near=0.01,
+                far=100,
+                entity_uid="Wrist-Camera-Mount-v11",  # Mount to dedicated camera link
+            ),
+        ]
+
     def __init__(self, *args, **kwargs):
 
         self.arm_joint_names = [
@@ -255,28 +299,33 @@ class Lekiwi(BaseAgent):
         )
         return deepcopy_dict(controller_configs)
 
-    def _after_loading_articulation(self):
-        super()._after_loading_articulation()
-        self.finger1_link = self.robot.links_map["Fixed_Jaw"]
-        self.finger2_link = self.robot.links_map["Moving_Jaw"]
-        self.finger1_tip = self.robot.links_map["Fixed_Jaw_tip"]
-        self.finger2_tip = self.robot.links_map["Moving_Jaw_tip"]
+    def _after_init(self):
+        # First arm
+        self.finger1_link: Link = sapien_utils.get_obj_by_name(
+            self.robot.get_links(), "Fixed_Jaw"
+        )
+        self.finger2_link: Link = sapien_utils.get_obj_by_name(
+            self.robot.get_links(), "Moving_Jaw"
+        )
+        self.finger1_tip: Link = sapien_utils.get_obj_by_name(
+            self.robot.get_links(), "Fixed_Jaw_tip"
+        )
+        self.finger2_tip: Link = sapien_utils.get_obj_by_name(
+            self.robot.get_links(), "Moving_Jaw_tip"
+        )
+        self.tcp: Link = self.finger1_link
 
-    @property
-    def tcp_pos(self):
-        # computes the tool center point as the mid point between the the fixed and moving jaw's tips
-        return (self.finger1_tip.pose.p + self.finger2_tip.pose.p) / 2
+        self.base_link: Link = sapien_utils.get_obj_by_name(
+            self.robot.get_links(), "base_link"
+        )
 
-    @property
-    def tcp_pose(self):
-        return Pose.create_from_pq(self.tcp_pos, self.finger1_link.pose.q)
+        self.base_link.set_collision_group_bit(
+            group=2, bit_idx=FETCH_BASE_COLLISION_BIT, bit=1
+        )
 
-    def _after_loading_articulation(self):
-        super()._after_loading_articulation()
-        self.finger1_link = self.robot.links_map["Fixed_Jaw"]
-        self.finger2_link = self.robot.links_map["Moving_Jaw"]
-        self.finger1_tip = self.robot.links_map["Fixed_Jaw_tip"]
-        self.finger2_tip = self.robot.links_map["Moving_Jaw_tip"]
+        self.queries: Dict[
+            str, Tuple[physx.PhysxGpuContactPairImpulseQuery, Tuple[int]]
+        ] = dict()
 
     def is_grasping(self, object: Actor, min_force=0.5, max_angle=110):
         """Check if the robot is grasping an object
@@ -309,7 +358,9 @@ class Lekiwi(BaseAgent):
         return torch.logical_and(lflag, rflag)
 
     def is_static(self, threshold=0.2):
-        qvel = self.robot.get_qvel()[:, :-1]  # exclude the gripper joint
+        qvel = self.robot.get_qvel()[
+            :, 3:-1
+        ]  # exclude the base joints
         return torch.max(torch.abs(qvel), 1)[0] <= threshold
 
     @staticmethod
@@ -323,3 +374,12 @@ class Lekiwi(BaseAgent):
         T[:3, :3] = np.stack([ortho, closing, approaching], axis=1)
         T[:3, 3] = center
         return sapien.Pose(T)
+
+    @property
+    def tcp_pos(self):
+        # computes the tool center point as the mid point between the the fixed and moving jaw's tips
+        return (self.finger1_tip.pose.p + self.finger2_tip.pose.p) / 2
+
+    @property
+    def tcp_pose(self):
+        return Pose.create_from_pq(self.tcp_pos, self.finger1_link.pose.q)
