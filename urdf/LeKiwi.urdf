@@ -1,5 +1,13 @@
 <?xml version='1.0' encoding='utf-8'?>
 <robot name="LeKiwi">
+    <material name="motor">
+        <color rgba="0.02 0.02 0.02 1" />
+    </material>
+
+    <material name="grey">
+        <color rgba="0.6 0.6 0.6 1" />
+    </material>
+
     <link name="base_link">
         <inertial>
             <origin xyz="-4.730687660675253e-15 -2.7155537377808555e-05 -0.0035000000000000005" rpy="0.0 0.0 0.0" />
@@ -49,6 +57,7 @@
             <geometry>
                 <mesh filename="meshes/ST3215_Servo_Motor-v1-2.stl" scale="0.001 0.001 0.001" />
             </geometry>
+            <material name="motor"> </material>
         </visual>
         <collision name="ST3215_Servo_Motor-v1-2_collision">
             <origin xyz="0.010249999999999999 -0.025599999999999987 -0.007250000007450583" rpy="-3.141592653589793 -1.5707963267948966 0" />
@@ -125,6 +134,7 @@
             <geometry>
                 <mesh filename="meshes/ST3215_Servo_Motor-v1-1.stl" scale="0.001 0.001 0.001" />
             </geometry>
+            <material name="motor"> </material>
         </visual>
         <collision name="ST3215_Servo_Motor-v1-1_collision">
             <origin xyz="0.010250000000000013 0.019478687706257793 -0.019238066498388086" rpy="-1.570796326794896 0.5235987755982991 -1.5707963267948968" />
@@ -201,6 +211,7 @@
             <geometry>
                 <mesh filename="meshes/ST3215_Servo_Motor-v1.stl" scale="0.001 0.001 0.001" />
             </geometry>
+            <material name="motor"> </material>
         </visual>
         <collision name="ST3215_Servo_Motor-v1_collision">
             <origin xyz="0.010250000000000035 0.006521312293742278 0.02579524618281096" rpy="1.5707963267948968 0.523598775598299 1.5707963267948972" />
@@ -486,6 +497,7 @@
             <geometry>
                 <mesh filename="meshes/STS3215_03a-v1.stl" scale="0.001 0.001 0.001" />
             </geometry>
+            <material name="motor"> </material>
         </visual>
         <collision name="STS3215_03a-v1_collision">
             <origin xyz="-0.010249997308103833 0.015899999999999928 -0.020299999252406824" rpy="-1.5707963267948992 1.5707963267948928 0" />
@@ -543,6 +555,7 @@
             <geometry>
                 <mesh filename="meshes/STS3215_03a-v1-1.stl" scale="0.001 0.001 0.001" />
             </geometry>
+            <material name="motor"> </material>
         </visual>
         <collision name="STS3215_03a-v1-1_collision">
             <origin xyz="0.01590000269189606 0.010250000747593227 -0.020299999999999888" rpy="3.061616997868385e-16 1.570796326794894 0" />
@@ -581,6 +594,7 @@
             <geometry>
                 <mesh filename="meshes/STS3215_03a-v1-2.stl" scale="0.001 0.001 0.001" />
             </geometry>
+            <material name="motor"> </material>
         </visual>
         <collision name="STS3215_03a-v1-2_collision">
             <origin xyz="0.015900002691896058 -0.011980260242951542 0.0193294077561961" rpy="-1.5707963267948655 -1.4835298641951797 -1.5707963267949274" />
@@ -619,6 +633,7 @@
             <geometry>
                 <mesh filename="meshes/STS3215_03a-v1-3.stl" scale="0.001 0.001 0.001" />
             </geometry>
+            <material name="motor"> </material>
         </visual>
         <collision name="STS3215_03a-v1-3_collision">
             <origin xyz="0.015900002691895933 -0.02177148665928616 0.006569225259552951" rpy="-1.5707963267949003 0.17453292519943228 -1.5707963267948974" />
@@ -657,6 +672,7 @@
             <geometry>
                 <mesh filename="meshes/STS3215_03a_Wrist_Roll-v1.stl" scale="0.001 0.001 0.001" />
             </geometry>
+            <material name="motor"> </material>
         </visual>
         <collision name="STS3215_03a_Wrist_Roll-v1_collision">
             <origin xyz="-0.01649999730810397 0.016009282130255525 -0.01007845679092931" rpy="-0.4363323129985829 -3.55514238212376e-15 -3.141592653589793" />
@@ -695,6 +711,7 @@
             <geometry>
                 <mesh filename="meshes/STS3215_03a-v1-4.stl" scale="0.001 0.001 0.001" />
             </geometry>
+            <material name="motor"> </material>
         </visual>
         <collision name="STS3215_03a-v1-4_collision">
             <origin xyz="-0.0202999973081038 -0.01600928457570463 0.010078452554247068" rpy="-0.4363323129985825 9.798519944458119e-17 -3.1415926535897896" />
@@ -895,7 +912,7 @@
 
     <joint name="root_z_rotation_joint" type="continuous">
         <parent link="root_arm_1_link_2"/>
-        <origin xyz="0 0 0.036" rpy="0 0 0" />
+        <origin xyz="0 0 0.015" rpy="0 0 0" />
         <child link="base_link"/>
         <axis xyz="0 0 1"/>
         <dynamics damping="10.0" friction="1"/>
@@ -1000,7 +1017,7 @@
         <child link="Top-V2-v2" />
     </joint>
     <joint name="base_plate_layer1-v5_Rigid-28" type="fixed">
-        <origin xyz="0.02 0.1 0.0" rpy="0.0 -0.0 0.0" />
+        <origin xyz="0.02 0.1 0.0" rpy="0.0 -0.0 1.57" />
         <parent link="base_link" />
         <child link="Camera-Mount-v8" />
     </joint>
