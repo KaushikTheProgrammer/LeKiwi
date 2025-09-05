@@ -59,7 +59,7 @@ class Lekiwi(BaseAgent):
     keyframes = dict(
         rest=Keyframe(
             pose=sapien.Pose(),
-            qpos=np.array([0, 0, 0, 0, 0.303, 0.303, 0, 0, 0]),
+            qpos=np.array([0.0, 0.0, 0.0, -1.921, 1.92, 0.136, 0.0, -1.1]),
         )
     )
 
@@ -101,16 +101,17 @@ class Lekiwi(BaseAgent):
     def __init__(self, *args, **kwargs):
 
         self.arm_joint_names = [
-            "shoulder_pan",
+            # "shoulder_pan",
             "shoulder_lift",
             "elbow_flex",
             "wrist_flex",
             "wrist_roll",
+            "gripper",
         ]
 
-        self.arm_stiffness = 2e4
+        self.arm_stiffness = 1e3
         self.arm_damping = 1e2
-        self.arm_force_limit = 250
+        self.arm_force_limit = 100
 
         self.gripper_joint_names = [
             "gripper",
@@ -137,20 +138,23 @@ class Lekiwi(BaseAgent):
             self.arm_joint_names,
             lower=None,
             upper=None,
-            stiffness=self.arm_stiffness,
-            damping=self.arm_damping,
+            stiffness=[self.arm_stiffness] * len(self.arm_joint_names),
+            damping=[self.arm_damping] * len(self.arm_joint_names),
             force_limit=self.arm_force_limit,
             normalize_action=False,
         )
+
         arm_pd_joint_delta_pos = PDJointPosControllerConfig(
-            self.arm_joint_names,
-            -0.1,
-            0.1,
-            self.arm_stiffness,
-            self.arm_damping,
-            self.arm_force_limit,
+            ["shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll"],
+            lower=[-.9,-0.9,0.9],
+            upper=[0.9,0.2,0.9],
+            stiffness=[self.arm_stiffness]*3,
+            damping=[self.arm_damping]*3,
+            force_limit=self.arm_force_limit,
             use_delta=True,
+            use_target=False,
         )
+
         arm_pd_joint_target_delta_pos = deepcopy(arm_pd_joint_delta_pos)
         arm_pd_joint_target_delta_pos.use_target = True
 
@@ -243,11 +247,12 @@ class Lekiwi(BaseAgent):
                 base=base_pd_joint_vel,
                 arm1=arm_pd_joint_delta_pos,
                 gripper1=gripper_pd_joint_pos,
+
             ),
             pd_joint_pos=dict(
-                arm=arm_pd_joint_pos,
-                gripper=gripper_pd_joint_pos,
                 base=base_pd_joint_vel,
+                arm=arm_pd_joint_pos,
+                # gripper=gripper_pd_joint_pos,
             ),
             pd_ee_delta_pos=dict(
                 arm=arm_pd_ee_delta_pos,
@@ -259,43 +264,43 @@ class Lekiwi(BaseAgent):
                 gripper=gripper_pd_joint_pos,
                 base=base_pd_joint_vel,
             ),
-            pd_ee_delta_pose_align=dict(
-                arm=arm_pd_ee_delta_pose_align,
-                gripper=gripper_pd_joint_pos,
-                base=base_pd_joint_vel,
-            ),
-            # TODO(jigu): how to add boundaries for the following controllers
-            pd_joint_target_delta_pos=dict(
-                arm=arm_pd_joint_target_delta_pos,
-                gripper=gripper_pd_joint_pos,
-                base=base_pd_joint_vel,
-            ),
-            pd_ee_target_delta_pos=dict(
-                arm=arm_pd_ee_target_delta_pos,
-                gripper=gripper_pd_joint_pos,
-                base=base_pd_joint_vel,
-            ),
-            pd_ee_target_delta_pose=dict(
-                arm=arm_pd_ee_target_delta_pose,
-                gripper=gripper_pd_joint_pos,
-                base=base_pd_joint_vel,
-            ),
-            # Caution to use the following controllers
-            pd_joint_vel=dict(
-                arm=arm_pd_joint_vel,
-                gripper=gripper_pd_joint_pos,
-                base=base_pd_joint_vel,
-            ),
-            pd_joint_pos_vel=dict(
-                arm=arm_pd_joint_pos_vel,
-                gripper=gripper_pd_joint_pos,
-                base=base_pd_joint_vel,
-            ),
-            pd_joint_delta_pos_vel=dict(
-                arm=arm_pd_joint_delta_pos_vel,
-                gripper=gripper_pd_joint_pos,
-                base=base_pd_joint_vel,
-            ),
+            # pd_ee_delta_pose_align=dict(
+            #     arm=arm_pd_ee_delta_pose_align,
+            #     gripper=gripper_pd_joint_pos,
+            #     base=base_pd_joint_vel,
+            # ),
+            # # TODO(jigu): how to add boundaries for the following controllers
+            # pd_joint_target_delta_pos=dict(
+            #     arm=arm_pd_joint_target_delta_pos,
+            #     gripper=gripper_pd_joint_pos,
+            #     base=base_pd_joint_vel,
+            # ),
+            # pd_ee_target_delta_pos=dict(
+            #     arm=arm_pd_ee_target_delta_pos,
+            #     gripper=gripper_pd_joint_pos,
+            #     base=base_pd_joint_vel,
+            # ),
+            # pd_ee_target_delta_pose=dict(
+            #     arm=arm_pd_ee_target_delta_pose,
+            #     gripper=gripper_pd_joint_pos,
+            #     base=base_pd_joint_vel,
+            # ),
+            # # Caution to use the following controllers
+            # pd_joint_vel=dict(
+            #     arm=arm_pd_joint_vel,
+            #     gripper=gripper_pd_joint_pos,
+            #     base=base_pd_joint_vel,
+            # ),
+            # pd_joint_pos_vel=dict(
+            #     arm=arm_pd_joint_pos_vel,
+            #     gripper=gripper_pd_joint_pos,
+            #     base=base_pd_joint_vel,
+            # ),
+            # pd_joint_delta_pos_vel=dict(
+            #     arm=arm_pd_joint_delta_pos_vel,
+            #     gripper=gripper_pd_joint_pos,
+            #     base=base_pd_joint_vel,
+            # ),
         )
         return deepcopy_dict(controller_configs)
 

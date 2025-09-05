@@ -35,7 +35,7 @@ class Args:
     """Number of environments to run."""
 
     control_mode: Annotated[Optional[str], tyro.conf.arg(aliases=["-c"])] = None
-    """Control mode"""
+    """Control mode. Use 'pd_joint_pos' for position control."""
 
     render_mode: str = "rgb_array"
     """Render mode"""
@@ -155,18 +155,58 @@ def main(args: Args):
     action = env.action_space.sample() if env.action_space is not None else None
     action = np.zeros_like(action)
 
+
     # Initialize target joint positions with zeros
     target_joints = np.zeros_like(action)
-    # Define the step size for changing target joints
-    joint_step = 0.01
-    # Define the gain for the proportional controller as a list for each joint
-    p_gain = np.ones_like(action)  # Default all gains to 1.0
-    # Specific gains can be adjusted here
-    p_gain[0] = 0.05   # Base forward/backward
-    p_gain[1] = 0.05     # Base rotation - lower gain for smoother turning
-    p_gain[2] = 0.1     # Shoulder pan - much lower gain for stability
-    p_gain[3:7] = 0.1  # Arm joints
-    p_gain[7:8] = 0.1  # Gripper joints
+
+    target_base_x = 0.0
+    current_base_x = 0.0
+    base_x_error = 0.0
+    base_x_kp = 2.0      # Proportional gain for base x control
+    base_x_max_vel = 1.0 # Maximum base x velocity
+    base_x_velocity = 0.0
+
+    # Yaw position control variables
+    target_yaw = 0.0  # Limits are -2pi to 2pi
+    current_yaw = 0.0
+    yaw_error = 0.0
+    yaw_kp = 2.0      # Proportional gain for yaw control
+    yaw_max_vel = 1.0 # Maximum yaw velocity
+
+    target_shoulder_lift = 0.0 # Limits are 0.1 (inwards to robot) to -pi (outwards from robot)
+    current_shoulder_lift = 0.0
+    shoulder_lift_error = 0.0
+    shoulder_lift_kp = 1.0      # Proportional gain for shoulder lift control
+    shoulder_lift_max_vel = 1.0 # Maximum shoulder lift velocity
+    shoulder_lift_velocity = 0.0
+
+    target_elbow_flex = 0.0 # Limits are pi(fully extended) and 0.03(fully retracted)
+    current_elbow_flex = 0.0
+    elbow_flex_error = 0.0
+    elbow_flex_kp = 1.0      # Proportional gain for elbow flex control
+    elbow_flex_max_vel = 1.0 # Maximum elbow flex velocity
+    elbow_flex_velocity = 0.0
+
+    target_wrist_flex = 0.0 # Limits are -0.3 to pi
+    current_wrist_flex = 0.0
+    wrist_flex_error = 0.0
+    wrist_flex_kp = 1.0      # Proportional gain for wrist flex control
+    wrist_flex_max_vel = 1.0 # Maximum wrist flex velocity
+    wrist_flex_velocity = 0.0
+
+    target_wrist_roll = 0.0 # Limits are -pi/2 to pi/2
+    current_wrist_roll = 0.0
+    wrist_roll_error = 0.0
+    wrist_roll_kp = 1.0      # Proportional gain for wrist roll control
+    wrist_roll_max_vel = 1.0 # Maximum wrist roll velocity
+    wrist_roll_velocity = 0.0
+
+    target_gripper = -1.5 # Gripper range is -pi/2 (open) to 0.1 (closed)
+    current_gripper = 0.0
+    gripper_error = 0.0
+    gripper_kp = 1.0      # Proportional gain for gripper control
+    gripper_max_vel = 1.0 # Maximum gripper velocity
+    gripper_velocity = 0.0
 
     # Get initial joint positions if available
     current_joints = np.zeros_like(action)
@@ -202,78 +242,83 @@ def main(args: Args):
         if step_counter >= warmup_steps:
             # Base forward/backward - direct control
             if keys[pygame.K_w]:
-                action[0] = 0.1  # Forward
+                target_base_x = 0.1 # Forward
             elif keys[pygame.K_s]:
-                action[0] = -0.1  # Backward
+                target_base_x = -0.1  # Backward
             else:
-                action[0] = 0.0  # Stop forward/backward movement
+                target_base_x = 0.0
 
-            # Base turning - using target_joints and P control
+            # Yaw position control - increment/decrement target yaw position
             if keys[pygame.K_a]:
-                target_joints[1] += joint_step*2  # Turn left
+                target_yaw += 0.1  # Increment target yaw (turn left)
             elif keys[pygame.K_d]:
-                target_joints[1] -= joint_step*2  # Turn right
-            else:
-                action[1] = 0.0
+                target_yaw -= 0.1  # Decrement target yaw (turn right)
 
-
-            # Arm control - using target_joints and P control
-            if keys[pygame.K_y]:
-                target_joints[2] += joint_step
-            if keys[pygame.K_u]:
-                target_joints[2] -= joint_step
-            if keys[pygame.K_8]:
-                target_joints[3] += joint_step
             if keys[pygame.K_i]:
-                target_joints[3] -= joint_step
-            if keys[pygame.K_9]:
-                target_joints[4] += joint_step
+                target_shoulder_lift += 0.1
             if keys[pygame.K_o]:
-                target_joints[4] -= joint_step
-            if keys[pygame.K_0]:
-                target_joints[5] += joint_step
-            if keys[pygame.K_p]:
-                target_joints[5] -= joint_step
-            if keys[pygame.K_MINUS]:
-                target_joints[6] += joint_step
-            if keys[pygame.K_LEFTBRACKET]:
-                target_joints[6] -= joint_step
+                target_shoulder_lift -= 0.1
 
-            # Gripper control - toggle between open and closed
-            if keys[pygame.K_f]:
-                # Toggle first gripper (index 8)
-                if target_joints[8] < 0.4:  # If closed or partially closed
-                    target_joints[8] = 2.5  # Open
-                else:
-                    target_joints[8] = 0.1  # Close
-                # Add a small delay to prevent multiple toggles
-                pygame.time.delay(200)
+            if keys[pygame.K_k]:
+                target_elbow_flex += 0.1
+            if keys[pygame.K_l]:
+                target_elbow_flex -= 0.1
+
+            if keys[pygame.K_n]:
+                target_wrist_flex += 0.1
+            if keys[pygame.K_m]:
+                target_wrist_flex -= 0.1
+
+            if keys[pygame.K_COMMA]:
+                target_wrist_roll += 0.1
+            if keys[pygame.K_PERIOD]:
+                target_wrist_roll -= 0.1
+
+            if keys[pygame.K_LEFT]:
+                target_gripper += 0.1
+            if keys[pygame.K_RIGHT]:
+                target_gripper -= 0.1
 
 
-        # Get current joint positions using our mapping function
+
+            current_yaw = current_joints[2]
+            current_shoulder_lift = current_joints[3]
+            current_elbow_flex = current_joints[4]
+            current_wrist_flex = current_joints[5]
+            current_wrist_roll = current_joints[6]
+            current_gripper = current_joints[7]
+
+            base_x_error = target_base_x - current_base_x
+            yaw_error = target_yaw - current_yaw
+            shoulder_lift_error = target_shoulder_lift - current_shoulder_lift
+            elbow_flex_error = target_elbow_flex - current_elbow_flex
+            wrist_flex_error = target_wrist_flex - current_wrist_flex
+            wrist_roll_error = target_wrist_roll - current_wrist_roll
+            gripper_error = target_gripper - current_gripper
+
+            base_x_velocity = base_x_kp * base_x_error
+            yaw_velocity = yaw_kp * yaw_error
+            shoulder_lift_input = shoulder_lift_kp * shoulder_lift_error
+            elbow_flex_input = elbow_flex_kp * elbow_flex_error
+            wrist_flex_input = wrist_flex_kp * wrist_flex_error
+            wrist_roll_input = wrist_roll_kp * wrist_roll_error
+            gripper_input = gripper_kp * gripper_error
+
         current_joints = get_mapped_joints(robot)
+
 
         # Simple P controller for arm joints only (not base)
         if step_counter < warmup_steps:
             action = np.zeros_like(action)
         else:
-            # Apply P control to turning (index 1) and arm joints (indices 2-11) and grippers (indices 12-13)
-            # Base forward/backward (index 0) is already set directly above
-            for i in range(1, len(action)):
-                error = target_joints[i] - current_joints[i]
-                action[i] = p_gain[i] * error
+            action[0] = base_x_velocity
+            action[1] = yaw_velocity
+            action[2] = shoulder_lift_input
+            action[3] = elbow_flex_input
+            action[4] = wrist_flex_input
+            action[5] = wrist_roll_input
+            action[6] = gripper_input
 
-                # Special handling for shoulder pan joint (index 2)
-                if i == 2:
-                    # Add deadband to prevent small oscillations
-                    if abs(error) < 0.01:
-                        action[i] = 0.0
-                    # Limit maximum action for shoulder pan
-                    action[i] = np.clip(action[i], -0.5, 0.5)
-                    print(f"Shoulder pan - error: {error:.4f}, action: {action[i]:.4f}, target: {target_joints[i]:.4f}, current: {current_joints[i]:.4f}")
-
-        # Clip actions to be within reasonable bound
-        # action = np.clip(action, -2, 2)
 
         screen.fill((0, 0, 0))
 
@@ -286,13 +331,13 @@ def main(args: Args):
             screen.blit(warmup_text, (300, 10))
 
         control_texts = [
-            "W/S: joint[0] (+/-)",
-            "A/D: joint[1] (+/-)",
-            "Y/U: joint[2] (+/-)",
-            "8/I: joint[3] (+/-)",
-            "9/O: joint[4] (+/-)",
-            "0/P: joint[5] (+/-)",
-            "-/[: joint[6] (+/-)",
+            "W/S: Forward/Backward (joint[0])",
+            "A/D: Yaw Position Control (joint[2])",
+            "Y/U: Arm joint[3] (+/-)",
+            "8/I: Arm joint[4] (+/-)",
+            "9/O: Arm joint[5] (+/-)",
+            "0/P: Arm joint[6] (+/-)",
+            "-/[: Arm joint[7] (+/-)",
             "R: Reset targets to current"
         ]
 
@@ -345,79 +390,23 @@ def main(args: Args):
         screen.blit(arm1_text, (10, y_pos))
 
 
-        # Group 1: Base control [0,1]
+        # Group 1: Base control [0,2] (forward/backward and yaw)
         y_pos += 25
-        base_targets = target_joints[0:2]
+        base_targets = np.array([target_joints[0], target_yaw])  # Forward/backward and yaw target
         base_target_text = font.render(
-            f"Base Target [0,1]: {np.round(base_targets, 2)}",
+            f"Base Target [0,yaw]: {np.round(base_targets, 2)}",
             True, (0, 255, 0)
         )
         screen.blit(base_target_text, (10, y_pos))
 
-        # Group 2: First arm [2,3,4,5,6]
+        # Group 2: First arm [3,4,5,6,7]
         y_pos += 25
-        arm1_targets = target_joints[2:7]
+        arm1_targets = target_joints[2:8]
         arm1_target_text = font.render(
-            f"Arm 1 Target [2,3,4,5,6]: {np.round(arm1_targets, 2)}",
+            f"Arm 1 Target [3,4,5,6,7]: {np.round(arm1_targets, 2)}",
             True, (0, 255, 0)
         )
         screen.blit(arm1_target_text, (10, y_pos))
-
-        # Group 4: Grippers [12,13]
-        y_pos += 25
-        gripper_targets = target_joints[8]
-        gripper_target_text = font.render(
-            f"Grippers Target [8,9]: {np.round(gripper_targets, 2)}",
-            True, (0, 255, 0)
-        )
-        screen.blit(gripper_target_text, (10, y_pos))
-
-        # Display current action values (velocities) in three logical groups
-        y_pos += 35
-
-        # Group 1: Base control [0,1]
-        base_actions = action[0:2]
-        base_action_text = font.render(
-            f"Base Velocity [0,1]: {np.round(base_actions, 2)}",
-            True, (255, 255, 255)
-        )
-        screen.blit(base_action_text, (10, y_pos))
-
-        # Group 2: First arm [2,3,4,5,6]
-        y_pos += 25
-        arm1_actions = action[2:7]
-        arm1_action_text = font.render(
-            f"Arm 1 Velocity [2,3,4,5,6]: {np.round(arm1_actions, 2)}",
-            True, (255, 255, 255)
-        )
-        screen.blit(arm1_action_text, (10, y_pos))
-
-
-        # Group 4: Grippers [12,13]
-        y_pos += 25
-        gripper_actions = action[7]
-        gripper_action_text = font.render(
-            f"Grippers Velocity [8,9]: {np.round(gripper_actions, 2)}",
-            True, (255, 255, 255)
-        )
-        screen.blit(gripper_action_text, (10, y_pos))
-
-        # Display action vector values
-        y_pos += 30
-        action_title = font.render("Action Vector:", True, (255, 255, 255))
-        screen.blit(action_title, (10, y_pos))
-        y_pos += 25
-
-        # Show action values in a simple format
-        action_str = "[" + ", ".join([f"{val:6.3f}" for val in action]) + "]"
-        action_text = font.render(action_str, True, (255, 255, 255))
-        screen.blit(action_text, (10, y_pos))
-
-        # Highlight shoulder pan joint (index 2) specifically
-        y_pos += 25
-        shoulder_pan_info = f"Shoulder Pan (joint 2): Target={target_joints[2]:.3f}, Current={current_joints[2]:.3f}, Action={action[2]:.3f}"
-        shoulder_text = font.render(shoulder_pan_info, True, (255, 255, 0))  # Yellow for visibility
-        screen.blit(shoulder_text, (10, y_pos))
 
         pygame.display.flip()
 
